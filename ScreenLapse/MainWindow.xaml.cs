@@ -40,6 +40,10 @@ namespace ScreenLapse {
         private int outputIndex;
         private float interval = 3f;
         private bool capture = false;
+        private double resolutionScale = 1f;
+
+        private System.Drawing.Imaging.ImageFormat format = System.Drawing.Imaging.ImageFormat.Jpeg;
+        private string ext = ".jpg";
 
         private int captureMode;
         private int captureItem;
@@ -54,6 +58,8 @@ namespace ScreenLapse {
             listedScreens = new List<Screen>();
 
             InitializeComponent();
+
+            FormatComboBox.SelectedIndex = 0;
 
             outputName = OutputNameTextBox.Text;
 
@@ -157,12 +163,19 @@ namespace ScreenLapse {
                     goto case 0;
             }
 
-            using (Bitmap cap = new Bitmap(rect.Right - rect.Left, rect.Bottom - rect.Top)) {
-                using (Graphics g = Graphics.FromImage(cap))
-                    g.CopyFromScreen(new System.Drawing.Point(rect.Left, rect.Top), System.Drawing.Point.Empty, new System.Drawing.Size(rect.Right - rect.Left, rect.Bottom - rect.Top));
+            int width = (int)((rect.Right - rect.Left) * resolutionScale + .5f);
+            int height = (int)((rect.Bottom - rect.Top) * resolutionScale + .5f);
+            using (Bitmap img = new Bitmap(width, height)) {
+                using (Bitmap cap = new Bitmap(rect.Right - rect.Left, rect.Bottom - rect.Top)) {
+                    using (Graphics g = Graphics.FromImage(cap))
+                        g.CopyFromScreen(new System.Drawing.Point(rect.Left, rect.Top), System.Drawing.Point.Empty, new System.Drawing.Size(rect.Right - rect.Left, rect.Bottom - rect.Top));
 
+                    using (Graphics g = Graphics.FromImage(img))
+                        g.DrawImage(cap, 0, 0, width, height);
+                }
                 if (!Directory.Exists(outputFolder)) Directory.CreateDirectory(outputFolder);
-                cap.Save(outputFolder + @"\" + outputName + "_" + outputIndex + ".png", System.Drawing.Imaging.ImageFormat.Png);
+                string path = outputFolder + @"\" + outputName + "_" + outputIndex + ext;
+                img.Save(path, format);
             }
             outputIndex++;
         }
@@ -202,6 +215,73 @@ namespace ScreenLapse {
 
         private void OutputNameTextBox_TextChanged(object sender, TextChangedEventArgs e) {
             outputName = OutputNameTextBox.Text;
+        }
+
+        private void FormatComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e) {
+            switch (FormatComboBox.SelectedIndex) {
+                case 0:
+                    format = System.Drawing.Imaging.ImageFormat.Jpeg;
+                    ext = ".jpg";
+                    break;
+                case 1:
+                    format = System.Drawing.Imaging.ImageFormat.Png;
+                    ext = ".png";
+                    break;
+                case 2:
+                    format = System.Drawing.Imaging.ImageFormat.Gif;
+                    ext = ".gif";
+                    break;
+                case 3:
+                    format = System.Drawing.Imaging.ImageFormat.Bmp;
+                    ext = ".bmp";
+                    break;
+            }
+        }
+        
+        private void ResolutionSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) {
+            if (ResolutionSlider != null && ResolutionTextBox != null) {
+                ResolutionSlider.Value = (int)(ResolutionSlider.Value + .5);
+                ResolutionTextBox.Text = ResolutionSlider.Value + "%";
+                resolutionScale = ResolutionSlider.Value / 100.0;
+            }
+        }
+
+        void OutputFolderTextBoxChanged() {
+            try {
+                Path.GetFullPath(OutputFolderTextBox.Text);
+                if (Path.IsPathRooted(OutputFolderTextBox.Text))
+                    outputFolder = OutputFolderTextBox.Text;
+                else
+                    OutputFolderTextBox.Text = outputFolder;
+            } catch {
+                OutputFolderTextBox.Text = outputFolder;
+            }
+        }
+        void ResolutionTextBoxChanged() {
+            string txt = ResolutionTextBox.Text;
+            if (txt.EndsWith("%"))
+                txt = txt.Substring(0, txt.Length - 1);
+            if (int.TryParse(txt, out int i) && i >= 10 && i <= 100) {
+                resolutionScale = i / 100f;
+                ResolutionSlider.Value = i;
+            }
+            ResolutionTextBox.Text = (int)(resolutionScale * 100 + .5f) + "%";
+        }
+
+        private void OutputFolderTextBox_LostFocus(object sender, RoutedEventArgs e) {
+            OutputFolderTextBoxChanged();
+        }
+        private void OutputFolderTextBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e) {
+            if (e.Key == System.Windows.Input.Key.Enter)
+                OutputFolderTextBoxChanged();
+        }
+
+        private void ResolutionTextBox_LostFocus(object sender, RoutedEventArgs e) {
+            ResolutionTextBoxChanged();
+        }
+        private void ResolutionTextBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e) {
+            if (e.Key == System.Windows.Input.Key.Enter)
+                ResolutionTextBoxChanged();
         }
     }
 }

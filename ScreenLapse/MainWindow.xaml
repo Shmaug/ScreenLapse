@@ -5,41 +5,56 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:ScreenLapse"
         mc:Ignorable="d"
-        Title="ScreenLapse" Height="335.333" Width="450.333" Closing="Window_Closing">
+        Title="ScreenLapse" Height="335" Width="450" Closing="Window_Closing">
     <Grid>
         <Grid x:Name="ControlGrid">
             <Label Content="Output Name:" HorizontalAlignment="Left" Margin="10,9,0,0" VerticalAlignment="Top"/>
             <TextBox x:Name="OutputNameTextBox" HorizontalAlignment="Left" Height="23" Margin="102,13,0,0" TextWrapping="Wrap" Text="capture" VerticalAlignment="Top" Width="120" TextChanged="OutputNameTextBox_TextChanged"/>
+            
             <Label Content="Output Folder:" HorizontalAlignment="Left" Margin="10,41,0,0" VerticalAlignment="Top"/>
-            <TextBox x:Name="OutputFolderTextBox" IsReadOnly="True" HorizontalAlignment="Left" Height="18" Margin="102,45,0,0" TextWrapping="Wrap" Text="Videos\Time Lapse" VerticalAlignment="Top" Width="200"/>
+            <TextBox x:Name="OutputFolderTextBox" HorizontalAlignment="Left" Height="18" Margin="102,45,0,0" TextWrapping="Wrap" Text="Videos\Time Lapse" VerticalAlignment="Top" Width="200" LostFocus="OutputFolderTextBox_LostFocus" KeyDown="OutputFolderTextBox_KeyDown"/>
             <Button x:Name="OutputFolderButton" Content="..." HorizontalAlignment="Left" Margin="307,45,0,0" VerticalAlignment="Top" Width="18" Height="18" Click="OutputFolderButton_Click"/>
-            <Label Content="Interval:" HorizontalAlignment="Left" Margin="10,72,0,0" VerticalAlignment="Top"/>
-            <TextBox x:Name="IntervalTextBox" HorizontalAlignment="Left" Height="18" Margin="65,76,0,0" TextWrapping="Wrap" Text="3" VerticalAlignment="Top" Width="23" TextAlignment="Center" TextChanged="IntervalTextBox_TextChanged"/>
-            <Label Content="seconds" HorizontalAlignment="Left" Margin="93,72,0,0" VerticalAlignment="Top"/>
-            <Label Content="Mode" HorizontalAlignment="Left" Margin="10,103,0,0" VerticalAlignment="Top"/>
-            <ComboBox x:Name="ModeComboBox" HorizontalAlignment="Left" Margin="56,105,0,0" VerticalAlignment="Top" Width="120" SelectionChanged="ModeComboBox_SelectionChanged">
+            
+            <Label Content="Format" HorizontalAlignment="Left" Margin="10,72,0,0" VerticalAlignment="Top"/>
+            <ComboBox x:Name="FormatComboBox" HorizontalAlignment="Left" Margin="102,74,0,0" VerticalAlignment="Top" Width="120" SelectionChanged="FormatComboBox_SelectionChanged">
+                <ComboBoxItem Content="Jpg"/>
+                <ComboBoxItem Content="Png"/>
+                <ComboBoxItem Content="Gif"/>
+                <ComboBoxItem Content="Bmp"/>
+            </ComboBox>
+            
+            <Label Content="Resolution" HorizontalAlignment="Left" Margin="10,103,0,0" VerticalAlignment="Top"/>
+            <Slider x:Name="ResolutionSlider" HorizontalAlignment="Left" Margin="102,107,0,0" VerticalAlignment="Top" Maximum="100" SmallChange="5" Value="100" Width="120" LargeChange="10" Minimum="10" TickPlacement="BottomRight" ValueChanged="ResolutionSlider_ValueChanged"/>
+            <TextBox x:Name="ResolutionTextBox" HorizontalAlignment="Left" Margin="227,107,0,0" TextWrapping="Wrap" Text="100%" VerticalAlignment="Top" Width="38" KeyDown="ResolutionTextBox_KeyDown" LostFocus="ResolutionTextBox_LostFocus"/>
+            
+            <Label Content="Interval:" HorizontalAlignment="Left" Margin="10,134,0,0" VerticalAlignment="Top"/>
+            <TextBox x:Name="IntervalTextBox" HorizontalAlignment="Left" Height="18" Margin="102,138,0,0" TextWrapping="Wrap" Text="3" VerticalAlignment="Top" Width="23" TextAlignment="Center" TextChanged="IntervalTextBox_TextChanged"/>
+            <Label Content="seconds" HorizontalAlignment="Left" Margin="130,134,0,0" VerticalAlignment="Top"/>
+            
+            <Label Content="Mode" HorizontalAlignment="Left" Margin="10,165,0,0" VerticalAlignment="Top"/>
+            <ComboBox x:Name="ModeComboBox" HorizontalAlignment="Left" Margin="102,167,0,0" VerticalAlignment="Top" Width="120" SelectionChanged="ModeComboBox_SelectionChanged">
                 <ComboBoxItem>Active Monitor</ComboBoxItem>
                 <ComboBoxItem>Single Monitor</ComboBoxItem>
                 <ComboBoxItem>Active Program</ComboBoxItem>
                 <ComboBoxItem>Single Program</ComboBoxItem>
             </ComboBox>
 
-            <Grid x:Name="ModePicker" Margin="10,134,0,0" HorizontalAlignment="Left" VerticalAlignment="Top" Height="26" Width="185">
+            <Grid x:Name="ModePicker" Margin="0,196,0,0" HorizontalAlignment="Left" VerticalAlignment="Top" Height="26" Width="185">
                 <Grid.Style>
                     <Style>
                         <Setter Property="Grid.Visibility" Value="Hidden"></Setter>
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding ElementName=ModeComboBox, Path=SelectedItem.Content}" Value="Single Program">
                                 <Setter Property="Grid.Visibility" Value="Visible"></Setter>
-                                </DataTrigger>
-                                <DataTrigger Binding="{Binding ElementName=ModeComboBox, Path=SelectedItem.Content}" Value="Single Monitor">
-                                    <Setter Property="Grid.Visibility" Value="Visible"></Setter>
-                                </DataTrigger>
-                            </Style.Triggers>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding ElementName=ModeComboBox, Path=SelectedItem.Content}" Value="Single Monitor">
+                                <Setter Property="Grid.Visibility" Value="Visible"></Setter>
+                            </DataTrigger>
+                        </Style.Triggers>
                     </Style>
                 </Grid.Style>
-                <Label x:Name="ModePickerLabel" Content="Program:" HorizontalAlignment="Left" VerticalAlignment="Top"/>
-                <ComboBox x:Name="ModePickerComboBox" HorizontalAlignment="Left" Margin="63,2,0,0" VerticalAlignment="Top" Width="120"/>
+                <Label x:Name="ModePickerLabel" Content="Program:" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10,0,0,0" Height="26" Width="58"/>
+                <ComboBox x:Name="ModePickerComboBox" HorizontalAlignment="Left" Margin="102,2,-37,0" VerticalAlignment="Top" Width="120" Grid.Column="1" Height="22"/>
             </Grid>
         </Grid>
 
