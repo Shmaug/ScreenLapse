@@ -13,6 +13,10 @@ using System.Drawing;
 
 namespace ScreenLapse {
     public partial class MainWindow : Window {
+        enum ImageFormat {
+            jpg, png, gif, bmp
+        }
+
         [StructLayout(LayoutKind.Sequential)]
         private struct Rect {
             public int Left;
@@ -38,12 +42,15 @@ namespace ScreenLapse {
         private string outputFolder;
         private string outputName;
         private int outputIndex;
-        private float interval = 3f;
+        private double interval = 3;
         private bool capture = false;
-        private double resolutionScale = 1f;
+        private double resolutionScale = 1;
+        private long quality = 75;
 
-        private System.Drawing.Imaging.ImageFormat format = System.Drawing.Imaging.ImageFormat.Jpeg;
-        private string ext = ".jpg";
+        private System.Drawing.Imaging.ImageFormat format;
+        private System.Drawing.Imaging.ImageCodecInfo encoder;
+        private System.Drawing.Imaging.EncoderParameters encoderParams;
+        private string ext;
 
         private int captureMode;
         private int captureItem;
@@ -69,36 +76,6 @@ namespace ScreenLapse {
             CalculateCaptureIndex();
         }
 
-        private void OutputFolderButton_Click(object sender, RoutedEventArgs e) {
-            using (FolderBrowserDialog dialog = new FolderBrowserDialog() { ShowNewFolderButton = true, SelectedPath = outputFolder }) {
-                DialogResult result = dialog.ShowDialog();
-                outputFolder = dialog.SelectedPath;
-                OutputFolderTextBox.Text = outputFolder;
-            }
-
-            CalculateCaptureIndex();
-        }
-
-        private void IntervalTextBox_TextChanged(object sender, TextChangedEventArgs e) {
-            interval = Convert.ToSingle(IntervalTextBox.Text);
-        }
-
-        private void StartButton_Click(object sender, RoutedEventArgs e) {
-            capture = !capture;
-            StartButton.Content = capture ? "Stop" : "Start";
-            StatusLabel.Content = "";
-
-            if (capture) {
-                captureThread = new Thread(CaptureLoop);
-                captureThread.Start();
-                captureMode = ModeComboBox.SelectedIndex;
-                captureItem = ModePickerComboBox.SelectedIndex;
-            } else {
-                captureThread.Join();
-            }
-            ControlGrid.IsEnabled = !capture;
-        }
-
         private void CalculateCaptureIndex() {
             outputIndex = 0;
             if (!Directory.Exists(outputFolder)) return;
@@ -112,8 +89,9 @@ namespace ScreenLapse {
                 string f = file.Split('_')[1];
                 outputIndex = Math.Max(outputIndex, int.Parse(f.Substring(0, f.IndexOf('.'))));
             }
+            StatusLabel.Dispatcher.Invoke(() => StatusLabel.Content = "Found " + outputIndex + " of " + ext);
         }
-
+        
         private void CaptureLoop() {
             while (capture) {
                 try {
@@ -136,7 +114,7 @@ namespace ScreenLapse {
                         Top = currentScreen.Bounds.Top,
                         Bottom = currentScreen.Bounds.Bottom
                     };
-                    StatusLabel.Dispatcher.Invoke(() => StatusLabel.Content = "Captured " + currentScreen.DeviceName + (currentScreen.Primary ? " (Primary)" : ""));
+                    //StatusLabel.Dispatcher.Invoke(() => StatusLabel.Content = "Captured " + currentScreen.DeviceName + (currentScreen.Primary ? " (Primary)" : ""));
                     break;
                 case 1:
                     rect = new Rect() {
@@ -154,7 +132,7 @@ namespace ScreenLapse {
                     StringBuilder stringBuilder = new StringBuilder(intLength);
                     if (GetWindowText(currentWindow, stringBuilder, intLength) > 0)
                         strTitle = stringBuilder.ToString();
-                    StatusLabel.Dispatcher.Invoke(() => StatusLabel.Content = "Captured " + strTitle);
+                    //StatusLabel.Dispatcher.Invoke(() => StatusLabel.Content = "Captured " + strTitle);
                     break;
                 case 3:
                     GetWindowRect(listedProcesses[captureItem].MainWindowHandle, ref rect);
@@ -175,15 +153,44 @@ namespace ScreenLapse {
                 }
                 if (!Directory.Exists(outputFolder)) Directory.CreateDirectory(outputFolder);
                 string path = outputFolder + @"\" + outputName + "_" + outputIndex + ext;
-                img.Save(path, format);
+
+                img.Save(path, encoder, encoderParams);
+                StatusLabel.Dispatcher.Invoke(() => StatusLabel.Content = outputName + "_" + outputIndex + ext);
             }
             outputIndex++;
+        }
+
+        private void UpdateCodec() {
+            encoder = null;
+            CodecLabel.Content = "No codec found";
+            StartButton.IsEnabled = false;
+
+            System.Drawing.Imaging.ImageCodecInfo[] codecs = System.Drawing.Imaging.ImageCodecInfo.GetImageEncoders();
+            foreach (var e in codecs) {
+                if (e.FormatID == format.Guid) {
+                    encoder = e;
+                    CodecLabel.Content = "Using Codec " + e.CodecName;
+                    StartButton.IsEnabled = true;
+                    encoderParams = new System.Drawing.Imaging.EncoderParameters(1);
+                    encoderParams.Param[0] = new System.Drawing.Imaging.EncoderParameter(System.Drawing.Imaging.Encoder.Quality, quality);
+                    break;
+                }
+            }
         }
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e) {
             if (capture) {
                 capture = false;
                 captureThread.Join();
+            }
+        }
+        
+        private void IntervalTextBox_TextChanged(object sender, TextChangedEventArgs e) {
+            try {
+                interval = Convert.ToDouble(IntervalTextBox.Text);
+            } catch (Exception ex) {
+                interval = 3.0;
+                IntervalTextBox.Text = "3";
             }
         }
 
@@ -212,11 +219,7 @@ namespace ScreenLapse {
                 }
             }
         }
-
-        private void OutputNameTextBox_TextChanged(object sender, TextChangedEventArgs e) {
-            outputName = OutputNameTextBox.Text;
-        }
-
+        
         private void FormatComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e) {
             switch (FormatComboBox.SelectedIndex) {
                 case 0:
@@ -236,38 +239,50 @@ namespace ScreenLapse {
                     ext = ".bmp";
                     break;
             }
-        }
-        
-        private void ResolutionSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) {
-            if (ResolutionSlider != null && ResolutionTextBox != null) {
-                ResolutionSlider.Value = (int)(ResolutionSlider.Value + .5);
-                ResolutionTextBox.Text = ResolutionSlider.Value + "%";
-                resolutionScale = ResolutionSlider.Value / 100.0;
-            }
+            UpdateCodec();
         }
 
+        private void StartButton_Click(object sender, RoutedEventArgs e) {
+            capture = !capture;
+            StartButton.Content = capture ? "Stop" : "Start";
+            StatusLabel.Content = "";
+
+            if (capture) {
+                captureThread = new Thread(CaptureLoop);
+                captureThread.Start();
+                captureMode = ModeComboBox.SelectedIndex;
+                captureItem = ModePickerComboBox.SelectedIndex;
+            } else {
+                captureThread.Join();
+            }
+            ControlGrid.IsEnabled = !capture;
+        }
+        
+        #region Output controls
+        private void OutputNameTextBox_TextChanged(object sender, TextChangedEventArgs e) {
+            outputName = OutputNameTextBox.Text;
+        }
+        private void OutputFolderButton_Click(object sender, RoutedEventArgs e) {
+            using (FolderBrowserDialog dialog = new FolderBrowserDialog() { ShowNewFolderButton = true, SelectedPath = outputFolder }) {
+                DialogResult result = dialog.ShowDialog();
+                outputFolder = dialog.SelectedPath;
+                OutputFolderTextBox.Text = outputFolder;
+            }
+
+            CalculateCaptureIndex();
+        }
         void OutputFolderTextBoxChanged() {
             try {
                 Path.GetFullPath(OutputFolderTextBox.Text);
-                if (Path.IsPathRooted(OutputFolderTextBox.Text))
+                if (Path.IsPathRooted(OutputFolderTextBox.Text)) {
                     outputFolder = OutputFolderTextBox.Text;
-                else
+                    CalculateCaptureIndex();
+                } else
                     OutputFolderTextBox.Text = outputFolder;
             } catch {
                 OutputFolderTextBox.Text = outputFolder;
             }
         }
-        void ResolutionTextBoxChanged() {
-            string txt = ResolutionTextBox.Text;
-            if (txt.EndsWith("%"))
-                txt = txt.Substring(0, txt.Length - 1);
-            if (int.TryParse(txt, out int i) && i >= 10 && i <= 100) {
-                resolutionScale = i / 100f;
-                ResolutionSlider.Value = i;
-            }
-            ResolutionTextBox.Text = (int)(resolutionScale * 100 + .5f) + "%";
-        }
-
         private void OutputFolderTextBox_LostFocus(object sender, RoutedEventArgs e) {
             OutputFolderTextBoxChanged();
         }
@@ -275,7 +290,27 @@ namespace ScreenLapse {
             if (e.Key == System.Windows.Input.Key.Enter)
                 OutputFolderTextBoxChanged();
         }
+        #endregion
 
+        #region Resolution controls
+        void ResolutionTextBoxChanged() {
+            string txt = ResolutionTextBox.Text;
+            if (txt.EndsWith("%"))
+                txt = txt.Substring(0, txt.Length - 1);
+            if (int.TryParse(txt, out int i) && i >= 10 && i <= 100) {
+                resolutionScale = i / 100d;
+                ResolutionSlider.Value = i;
+            }
+            ResolutionTextBox.Text = (int)(resolutionScale * 100 + .5) + "%";
+        }
+
+        private void ResolutionSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) {
+            if (ResolutionSlider != null && ResolutionTextBox != null) {
+                ResolutionSlider.Value = (int)(ResolutionSlider.Value + .5);
+                ResolutionTextBox.Text = ResolutionSlider.Value + "%";
+                resolutionScale = ResolutionSlider.Value / 100d;
+            }
+        }
         private void ResolutionTextBox_LostFocus(object sender, RoutedEventArgs e) {
             ResolutionTextBoxChanged();
         }
@@ -283,5 +318,39 @@ namespace ScreenLapse {
             if (e.Key == System.Windows.Input.Key.Enter)
                 ResolutionTextBoxChanged();
         }
+        #endregion
+
+        #region Compression controls
+        void QualityTextBoxChanged() {
+            string txt = QualityTextBox.Text;
+            if (txt.EndsWith("%"))
+                txt = txt.Substring(0, txt.Length - 1);
+            if (long.TryParse(txt, out long i) && i >= 10 && i <= 100) {
+                quality = i;
+                QualitySlider.Value = i;
+            }
+            QualityTextBox.Text = quality + "%";
+
+            if (encoderParams != null)
+                encoderParams.Param[0] = new System.Drawing.Imaging.EncoderParameter(System.Drawing.Imaging.Encoder.Quality, quality);
+        }
+
+        private void CompressionSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) {
+            if (QualitySlider != null && QualityTextBox != null) {
+                QualitySlider.Value = (int)(QualitySlider.Value + .5);
+                QualityTextBox.Text = QualitySlider.Value + "%";
+                quality = (long)QualitySlider.Value;
+                if (encoderParams != null)
+                    encoderParams.Param[0] = new System.Drawing.Imaging.EncoderParameter(System.Drawing.Imaging.Encoder.Quality, quality);
+            }
+        }
+        private void QualityTextBox_LostFocus(object sender, RoutedEventArgs e) {
+            QualityTextBoxChanged();
+        }
+        private void QualityTextBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e) {
+            if (e.Key == System.Windows.Input.Key.Enter)
+                QualityTextBoxChanged();
+        }
+        #endregion
     }
 }
