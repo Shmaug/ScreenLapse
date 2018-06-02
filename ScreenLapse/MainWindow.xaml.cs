@@ -263,12 +263,18 @@ namespace ScreenLapse {
             outputName = OutputNameTextBox.Text;
         }
         private void OutputFolderButton_Click(object sender, RoutedEventArgs e) {
-            using (FolderBrowserDialog dialog = new FolderBrowserDialog() { ShowNewFolderButton = true, SelectedPath = outputFolder }) {
+
+            using (Ookii.Dialogs.VistaFolderBrowserDialog dialog = new Ookii.Dialogs.VistaFolderBrowserDialog() {
+                SelectedPath = outputFolder,
+                ShowNewFolderButton = true,
+                Description = "Select Output Folder",
+                UseDescriptionForTitle = true,
+            }) {
                 DialogResult result = dialog.ShowDialog();
                 outputFolder = dialog.SelectedPath;
                 OutputFolderTextBox.Text = outputFolder;
             }
-
+            
             CalculateCaptureIndex();
         }
         void OutputFolderTextBoxChanged() {
